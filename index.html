@@ -90,7 +90,7 @@ function createHeartRateChart() {
         opacity: 0.6
     });
     const panel = new THREE.Mesh(panelGeo, panelMat);
-    panel.position.set(-panelWidth/2, 0.75, -0.01); // slightly behind the chart
+    panel.position.set(panelWidth/2, 0.75, -0.01); // slightly behind the chart
     group.add(panel);
 
     // --- Heart rate line ---

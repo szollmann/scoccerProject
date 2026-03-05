@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WebXR Soccer Field Cube</title>
+<style>
+  body { margin: 0; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.156.0/build/three.module.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.156.0/examples/jsm/webxr/ARButton.js';
+
+// --- Scene Setup ---
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['local-floor'] }));
+
+// --- Add a simple cube ---
+const geometry = new THREE.BoxGeometry(0.2,0.2,0.2);
+const material = new THREE.MeshNormalMaterial();
+const cube = new THREE.Mesh(geometry, material);
+scene.add(cube);
+
+// --- Soccer field coordinate system ---
+// Assume field corners in meters (top-left, top-right, bottom-right, bottom-left)
+const fieldWidth = 10; // example width
+const fieldHeight = 7; // example height
+const fieldCorners = [
+  new THREE.Vector3(0,0,0),              // top-left
+  new THREE.Vector3(fieldWidth,0,0),     // top-right
+  new THREE.Vector3(fieldWidth,0,fieldHeight), // bottom-right
+  new THREE.Vector3(0,0,fieldHeight)     // bottom-left
+];
+
+// Target cube position in field coordinates
+const cubeFieldPos = new THREE.Vector3(fieldWidth/2, 0, fieldHeight/2); // center of field
+
+// --- Animate loop ---
+renderer.setAnimationLoop((timestamp, frame) => {
+    if (frame) {
+        // Get device pose relative to local-floor reference space
+        const referenceSpace = renderer.xr.getReferenceSpace();
+        const session = renderer.xr.getSession();
+        const pose = frame.getViewerPose(referenceSpace);
+        if (pose) {
+            // For simplicity, assume the origin of local-floor aligns with field top-left
+            // Map cube field position to world coordinates directly
+            cube.position.set(cubeFieldPos.x, cubeFieldPos.y + 0.1, cubeFieldPos.z);
+        }
+    }
+    renderer.render(scene, camera);
+});
+
+// --- Handle window resize ---
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

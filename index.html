@@ -61,6 +61,7 @@ function init() {
       const chart = createHeartRateChart();
       reticle.matrix.decompose(chart.position, chart.quaternion, chart.scale);
       chart.scale.set(0.5, 0.5, 0.5); // scale chart smaller
+      chart.position.y += 1;
       scene.add(chart);
     }
   }
@@ -80,55 +81,65 @@ function init() {
 function createHeartRateChart() {
     const group = new THREE.Group();
 
-    // --- Panel background ---
+    // --- Panel dimensions ---
     const panelWidth = 2.5;   // AR units
     const panelHeight = 1.5;
+    const panelDepth = 0.0;   // z-plane of the panel
+    const panelMargin = 0.1 * panelHeight; // top/bottom margin
+
+    // --- Panel background (double-sided) ---
     const panelGeo = new THREE.PlaneGeometry(panelWidth, panelHeight);
     const panelMat = new THREE.MeshBasicMaterial({
         color: 0x222244,
         transparent: true,
-        opacity: 0.6
+        opacity: 0.6,
+        side: THREE.DoubleSide
     });
     const panel = new THREE.Mesh(panelGeo, panelMat);
-    panel.position.set(panelWidth / 2, panelHeight / 2, -0.01); // center the panel
+    // Panel origin at bottom-left corner (optional: slightly above 0)
+    panel.position.set(panelWidth / 2, panelHeight / 2, panelDepth);
     group.add(panel);
 
     // --- Simulated heart rate data ---
     const points = 50;
     const rawData = [];
     for (let i = 0; i < points; i++) {
-        rawData.push(Math.sin(i * 0.3) * 10 + 75 + Math.random() * 5); // 60-90 bpm
+        rawData.push(Math.sin(i * 0.3) * 10 + 75 + Math.random() * 5); // 60-90 bpm approx
     }
 
-    // --- Normalize to panel height with margins ---
+    // --- Normalize data to fit panel height ---
     const minValue = Math.min(...rawData);
     const maxValue = Math.max(...rawData);
-    const margin = 0.1 * panelHeight; // leave 10% top/bottom margin
-    const chartHeight = panelHeight - 2 * margin;
-    const normalizedData = rawData.map(v => ((v - minValue) / (maxValue - minValue)) * chartHeight + margin);
+    const chartHeight = panelHeight - 2 * panelMargin;
+    const normalizedData = rawData.map(v => ((v - minValue) / (maxValue - minValue)) * chartHeight + panelMargin);
 
-    // --- Build line geometry starting at panel bottom-left ---
+    // --- Build line geometry slightly in front of panel ---
     const geometry = new THREE.BufferGeometry();
     const vertices = [];
-    const chartWidth = panelWidth * 0.9; // leave some left/right margin
+    const chartWidth = panelWidth * 0.9; // leave 5% margin left/right
+    const zOffset = 0.01; // 1 cm in front of panel
     for (let i = 0; i < normalizedData.length; i++) {
-        const x = (i / (points - 1)) * chartWidth + panelWidth * 0.05; // offset from left
-        const y = normalizedData[i]; // already offset by margin
-        vertices.push(x, y, 0);
+        const x = (i / (points - 1)) * chartWidth + panelWidth * 0.05; // start at left margin
+        const y = normalizedData[i]; // y offset with margin
+        vertices.push(x, y, zOffset);
     }
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 
-    const material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
-    const line = new THREE.Line(geometry, material);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
+    const line = new THREE.Line(geometry, lineMat);
     group.add(line);
 
-    // --- Last data point cube ---
+    // --- Last data point indicator cube ---
     const lastCube = new THREE.Mesh(
         new THREE.BoxGeometry(0.02, 0.02, 0.02),
         new THREE.MeshBasicMaterial({ color: 0xffff00 })
     );
-    lastCube.position.set(vertices[(points-1)*3], vertices[(points-1)*3 + 1], 0);
+    lastCube.position.set(vertices[(points-1)*3], vertices[(points-1)*3 + 1], zOffset);
     group.add(lastCube);
+
+    // --- Optional: lift entire widget above the ground ---
+    const yOffsetAboveGround = 0.05; // 5 cm
+    group.position.y += yOffsetAboveGround;
 
     return group;
 }

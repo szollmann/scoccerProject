@@ -80,30 +80,41 @@ function init() {
 function createHeartRateChart() {
     const group = new THREE.Group();
 
-    // --- Background panel ---
-    const panelWidth = 1.5;  // width in meters (AR space)
-    const panelHeight = 1.5; // height in meters
+    // --- Panel background ---
+    const panelWidth = 2.5;   // AR units
+    const panelHeight = 1.5;
     const panelGeo = new THREE.PlaneGeometry(panelWidth, panelHeight);
     const panelMat = new THREE.MeshBasicMaterial({
-        color: 0x222244,     // dark blue-ish
+        color: 0x222244,
         transparent: true,
         opacity: 0.6
     });
     const panel = new THREE.Mesh(panelGeo, panelMat);
-    panel.position.set(panelWidth/2, 0.75, -0.01); // slightly behind the chart
+    panel.position.set(panelWidth / 2, panelHeight / 2, -0.01); // center the panel
     group.add(panel);
 
-    // --- Heart rate line ---
-    const data = [];
+    // --- Simulated heart rate data ---
     const points = 50;
+    const rawData = [];
     for (let i = 0; i < points; i++) {
-        data.push(Math.sin(i * 0.3) * 10 + 75 + Math.random() * 5);
+        rawData.push(Math.sin(i * 0.3) * 10 + 75 + Math.random() * 5); // 60-90 bpm
     }
 
+    // --- Normalize to panel height with margins ---
+    const minValue = Math.min(...rawData);
+    const maxValue = Math.max(...rawData);
+    const margin = 0.1 * panelHeight; // leave 10% top/bottom margin
+    const chartHeight = panelHeight - 2 * margin;
+    const normalizedData = rawData.map(v => ((v - minValue) / (maxValue - minValue)) * chartHeight + margin);
+
+    // --- Build line geometry starting at panel bottom-left ---
     const geometry = new THREE.BufferGeometry();
     const vertices = [];
-    for (let i = 0; i < data.length; i++) {
-        vertices.push(i * 0.05, data[i] * 0.01, 0);
+    const chartWidth = panelWidth * 0.9; // leave some left/right margin
+    for (let i = 0; i < normalizedData.length; i++) {
+        const x = (i / (points - 1)) * chartWidth + panelWidth * 0.05; // offset from left
+        const y = normalizedData[i]; // already offset by margin
+        vertices.push(x, y, 0);
     }
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 
@@ -116,7 +127,7 @@ function createHeartRateChart() {
         new THREE.BoxGeometry(0.02, 0.02, 0.02),
         new THREE.MeshBasicMaterial({ color: 0xffff00 })
     );
-    lastCube.position.set((data.length - 1) * 0.05, data[data.length - 1] * 0.01, 0);
+    lastCube.position.set(vertices[(points-1)*3], vertices[(points-1)*3 + 1], 0);
     group.add(lastCube);
 
     return group;

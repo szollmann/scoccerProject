@@ -1,124 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Three.js AR Hit Test Demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <style>
-    body { margin: 0; overflow: hidden; }
-    #info { position: absolute; top: 10px; width: 100%; text-align: center; z-index: 1; color: #fff; font-family: sans-serif; }
-  </style>
+<meta charset="UTF-8">
+<title>WebXR AR Heart Rate Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  body { margin: 0; overflow: hidden; }
+  #info { position: absolute; top: 10px; width: 100%; text-align: center; z-index: 1; color: #fff; font-family: sans-serif; }
+</style>
 </head>
 <body>
-  <div id="info">
-    <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> AR - hit test
-  </div>
+<div id="info">
+  <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> AR - heart rate chart
+</div>
 
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.156.0/build/three.module.js';
-    import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.156.0/examples/jsm/webxr/ARButton.js';
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.156.0/build/three.module.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.156.0/examples/jsm/webxr/ARButton.js';
 
-    let container;
-    let camera, scene, renderer;
-    let controller1, controller2;
-    let reticle;
-    let hitTestSource = null;
-    let hitTestSourceRequested = false;
+let container, camera, scene, renderer;
+let controller1, controller2;
+let reticle;
+let hitTestSource = null;
+let hitTestSourceRequested = false;
 
-    init();
+init();
 
-    function init() {
-      container = document.createElement('div');
-      document.body.appendChild(container);
+function init() {
+  container = document.createElement('div');
+  document.body.appendChild(container);
 
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-      const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
-      light.position.set(0.5, 1, 0.25);
-      scene.add(light);
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
+  light.position.set(0.5, 1, 0.25);
+  scene.add(light);
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      renderer.setAnimationLoop(animate);
-      container.appendChild(renderer.domElement);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  renderer.setAnimationLoop(animate);
+  container.appendChild(renderer.domElement);
 
-      document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
-      // Cylinder geometry for tap placement
-      const geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.2, 32).translate(0, 0.1, 0);
-      function onSelect() {
-        if (reticle.visible) {
-          const material = new THREE.MeshPhongMaterial({ color: 0xffffff * Math.random() });
-          const mesh = new THREE.Mesh(geometry, material);
-          reticle.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
-          mesh.scale.y = Math.random() * 2 + 1;
-          scene.add(mesh);
-        }
+  // Reticle for hit-test
+  reticle = new THREE.Mesh(
+    new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI/2),
+    new THREE.MeshBasicMaterial()
+  );
+  reticle.matrixAutoUpdate = false;
+  reticle.visible = false;
+  scene.add(reticle);
+
+  // Controller to handle taps
+  function onSelect() {
+    if (reticle.visible) {
+      const chart = createHeartRateChart();
+      reticle.matrix.decompose(chart.position, chart.quaternion, chart.scale);
+      chart.scale.set(0.5, 0.5, 0.5); // scale chart smaller
+      scene.add(chart);
+    }
+  }
+
+  controller1 = renderer.xr.getController(0);
+  controller1.addEventListener('select', onSelect);
+  scene.add(controller1);
+
+  controller2 = renderer.xr.getController(1);
+  controller2.addEventListener('select', onSelect);
+  scene.add(controller2);
+
+  window.addEventListener('resize', onWindowResize);
+}
+
+// Simple simulated heart rate chart (line)
+function createHeartRateChart() {
+  const group = new THREE.Group();
+
+  const data = [];
+  const points = 50;
+  for (let i=0; i<points; i++) {
+    // simulate 60-100 bpm heart rate waveform
+    data.push( Math.sin(i * 0.3) * 10 + 75 + Math.random()*5 );
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  const vertices = [];
+  for (let i=0; i<data.length; i++) {
+    vertices.push(i*0.05, data[i]*0.01, 0); // scale down for AR space
+  }
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+  const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
+  const line = new THREE.Line(geometry, material);
+  group.add(line);
+
+  // Optional: add a small cube at the last point to indicate current HR
+  const lastCube = new THREE.Mesh(
+    new THREE.BoxGeometry(0.01,0.01,0.01),
+    new THREE.MeshBasicMaterial({ color: 0xffff00 })
+  );
+  lastCube.position.set((data.length-1)*0.05, data[data.length-1]*0.01, 0);
+  group.add(lastCube);
+
+  return group;
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function animate(timestamp, frame) {
+  if (frame) {
+    const referenceSpace = renderer.xr.getReferenceSpace();
+    const session = renderer.xr.getSession();
+
+    if (!hitTestSourceRequested) {
+      session.requestReferenceSpace('viewer').then((refSpace) => {
+        session.requestHitTestSource({ space: refSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
+
+      session.addEventListener('end', () => {
+        hitTestSourceRequested = false;
+        hitTestSource = null;
+      });
+
+      hitTestSourceRequested = true;
+    }
+
+    if (hitTestSource) {
+      const hitTestResults = frame.getHitTestResults(hitTestSource);
+      if (hitTestResults.length) {
+        const hit = hitTestResults[0];
+        const pose = hit.getPose(referenceSpace);
+        reticle.visible = true;
+        reticle.matrix.fromArray(pose.transform.matrix);
+      } else {
+        reticle.visible = false;
       }
-
-      controller1 = renderer.xr.getController(0);
-      controller1.addEventListener('select', onSelect);
-      scene.add(controller1);
-
-      controller2 = renderer.xr.getController(1);
-      controller2.addEventListener('select', onSelect);
-      scene.add(controller2);
-
-      reticle = new THREE.Mesh(
-        new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
-        new THREE.MeshBasicMaterial()
-      );
-      reticle.matrixAutoUpdate = false;
-      reticle.visible = false;
-      scene.add(reticle);
-
-      window.addEventListener('resize', onWindowResize);
     }
+  }
 
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
-
-    function animate(timestamp, frame) {
-      if (frame) {
-        const referenceSpace = renderer.xr.getReferenceSpace();
-        const session = renderer.xr.getSession();
-
-        if (!hitTestSourceRequested) {
-          session.requestReferenceSpace('viewer').then((refSpace) => {
-            session.requestHitTestSource({ space: refSpace }).then((source) => {
-              hitTestSource = source;
-            });
-          });
-
-          session.addEventListener('end', () => {
-            hitTestSourceRequested = false;
-            hitTestSource = null;
-          });
-
-          hitTestSourceRequested = true;
-        }
-
-        if (hitTestSource) {
-          const hitTestResults = frame.getHitTestResults(hitTestSource);
-          if (hitTestResults.length) {
-            const hit = hitTestResults[0];
-            const pose = hit.getPose(referenceSpace);
-            reticle.visible = true;
-            reticle.matrix.fromArray(pose.transform.matrix);
-          } else {
-            reticle.visible = false;
-          }
-        }
-      }
-
-      renderer.render(scene, camera);
-    }
-  </script>
+  renderer.render(scene, camera);
+}
+</script>
 </body>
 </html>

@@ -78,35 +78,48 @@ function init() {
 
 // Simple simulated heart rate chart (line)
 function createHeartRateChart() {
-  const group = new THREE.Group();
+    const group = new THREE.Group();
 
-  const data = [];
-  const points = 50;
-  for (let i=0; i<points; i++) {
-    // simulate 60-100 bpm heart rate waveform
-    data.push( Math.sin(i * 0.3) * 10 + 75 + Math.random()*5 );
-  }
+    // --- Background panel ---
+    const panelWidth = 2.5;  // width in meters (AR space)
+    const panelHeight = 1.5; // height in meters
+    const panelGeo = new THREE.PlaneGeometry(panelWidth, panelHeight);
+    const panelMat = new THREE.MeshBasicMaterial({
+        color: 0x222244,     // dark blue-ish
+        transparent: true,
+        opacity: 0.6
+    });
+    const panel = new THREE.Mesh(panelGeo, panelMat);
+    panel.position.set(panelWidth/2 * 0.05, 0.75, -0.01); // slightly behind the chart
+    group.add(panel);
 
-  const geometry = new THREE.BufferGeometry();
-  const vertices = [];
-  for (let i=0; i<data.length; i++) {
-    vertices.push(i*0.05, data[i]*0.01, 0); // scale down for AR space
-  }
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    // --- Heart rate line ---
+    const data = [];
+    const points = 50;
+    for (let i = 0; i < points; i++) {
+        data.push(Math.sin(i * 0.3) * 10 + 75 + Math.random() * 5);
+    }
 
-  const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
-  const line = new THREE.Line(geometry, material);
-  group.add(line);
+    const geometry = new THREE.BufferGeometry();
+    const vertices = [];
+    for (let i = 0; i < data.length; i++) {
+        vertices.push(i * 0.05, data[i] * 0.01, 0);
+    }
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
 
-  // Optional: add a small cube at the last point to indicate current HR
-  const lastCube = new THREE.Mesh(
-    new THREE.BoxGeometry(0.01,0.01,0.01),
-    new THREE.MeshBasicMaterial({ color: 0xffff00 })
-  );
-  lastCube.position.set((data.length-1)*0.05, data[data.length-1]*0.01, 0);
-  group.add(lastCube);
+    const material = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 2 });
+    const line = new THREE.Line(geometry, material);
+    group.add(line);
 
-  return group;
+    // --- Last data point cube ---
+    const lastCube = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.02, 0.02),
+        new THREE.MeshBasicMaterial({ color: 0xffff00 })
+    );
+    lastCube.position.set((data.length - 1) * 0.05, data[data.length - 1] * 0.01, 0);
+    group.add(lastCube);
+
+    return group;
 }
 
 function onWindowResize() {
